@@ -30,6 +30,14 @@ public:
     // the web UI's "Light all" preview button.
     void lightAllFor(uint32_t durationMs);
 
+    // Suspend the clock and run a lively "party" light show for the given
+    // duration, then return to the clock on its own. Triggered at the scheduled
+    // party time (and by the web UI's "Party now" button).
+    void partyFor(uint32_t durationMs);
+
+    // True while a party is currently running (so callers can report status).
+    bool isPartying() const { return partying_; }
+
     // Render and push one animation frame. Call frequently (~60fps).
     //   hourFloat  current local time as hours since midnight (e.g. 13.5 = 13:30)
     //   haveTime   false until NTP has delivered a real time -> shows a gentle
@@ -50,12 +58,15 @@ private:
     uint8_t masterBrightness_ = 140;
     uint32_t lastFrameMs_ = 0;
     uint32_t lightAllUntilMs_ = 0;  // 0 = inactive; else "light all" expiry time
+    uint32_t partyUntilMs_ = 0;     // 0 = inactive; else party expiry time
+    bool partying_ = false;         // reflects whether the last frame was a party
 
     void shimmerColor(uint16_t i, float sampleHour, float t, float out[3]);
     void buildClockTargets(float hourFloat, float t, float target[][3]);
     void buildAllOnTargets(float t, float target[][3]);
+    void buildPartyTargets(float t, float target[][3]);
     void buildWaitingTargets(float t, float target[][3]);
-    void easeAndShow(const float target[][3], float dt);
+    void easeAndShow(const float target[][3], float dt, float tau);
 };
 
 #endif // LEDCLOCK_H

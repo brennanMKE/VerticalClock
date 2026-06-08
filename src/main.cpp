@@ -75,6 +75,23 @@ void loop() {
             ESP_LOGD(TAG, "%02d:%02d:%02d (hour %.3f)",
                      timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
                      currentHourFloat);
+
+            // Fire the scheduled party once when local time reaches the chosen
+            // hour:minute. "Armed" prevents re-triggering every second within
+            // that minute; it re-arms once the minute passes.
+            static bool partyArmed = true;
+            bool atPartyTime = clockPages.getPartyEnabled() &&
+                               timeinfo.tm_hour == clockPages.getPartyHour() &&
+                               timeinfo.tm_min == clockPages.getPartyMinute();
+            if (atPartyTime) {
+                if (partyArmed) {
+                    ledClock.partyFor(60000);  // a full minute of dancing lights
+                    partyArmed = false;
+                    Serial.println("Party time! 🎉");
+                }
+            } else {
+                partyArmed = true;
+            }
         }
     }
 

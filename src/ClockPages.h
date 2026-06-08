@@ -29,6 +29,12 @@ public:
     uint8_t getSchemeIndex() const { return schemeIndex; }
     uint8_t getBrightness() const { return brightness; }
 
+    // Scheduled party time (24-hour). The main loop triggers a party when the
+    // local time reaches this hour:minute, if enabled.
+    bool getPartyEnabled() const { return partyEnabled; }
+    uint8_t getPartyHour() const { return partyHour; }
+    uint8_t getPartyMinute() const { return partyMinute; }
+
     // CustomPageHandler: register our routes on EasyWiFi's web server.
     void registerRoutes() override;
 
@@ -40,6 +46,9 @@ private:
     String timezone;
     uint8_t schemeIndex = 0;
     uint8_t brightness = 140;
+    bool partyEnabled = false;
+    uint8_t partyHour = 18;     // default 18:00 (only fires when enabled)
+    uint8_t partyMinute = 0;
 
     void applyTimezone();   // setenv("TZ", ...) + tzset()
     void applyToLeds();     // push scheme + brightness into LedClock
@@ -48,7 +57,8 @@ private:
     void handleSave();      // POST /save -> persist + apply + redirect
     void handleApply();     // GET /apply -> apply scheme/brightness live (no NVS)
     void handleAll();       // GET /all   -> light every LED full for 10s
-    void handleState();     // GET /state -> JSON {valid,time,hour,leds[]}
+    void handleParty();     // GET /party -> start a one-minute party now
+    void handleState();     // GET /state -> JSON {valid,time,hour,party,leds[]}
 };
 
 // Available timezones and the saved default, defined in ClockPages.cpp.

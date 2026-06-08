@@ -18,7 +18,8 @@ static const float BRI_PERIOD_S = 11.0f;  // brightness shimmer cycle
 static const float BRI_PHASE_STEP = 0.80f; // per-LED phase offset (brightness)
 static const float BRI_DEPTH = 0.28f;      // shimmer depth (0..1)
 
-static const float EASE_TAU_S = 2.0f;      // blend time constant
+static const float EASE_TAU_S = 2.0f;       // normal blend time constant
+static const float PARTY_EASE_TAU_S = 0.10f; // snappier blend so dancing stays crisp
 static const float TWO_PI_F = 6.2831853f;
 
 // Brightness of the in-progress hour's LED at the very start of the hour. It
@@ -91,6 +92,26 @@ void LedClock::buildAllOnTargets(float t, float target[][3]) {
     }
 }
 
+// Build targets for party mode: a fast scrolling rainbow with a 2-ish Hz beat
+// pulse and random white sparkles. With the short party ease the sparkles
+// twinkle and the rainbow flows — a lively dance that ignores the clock.
+void LedClock::buildPartyTargets(float t, float target[][3]) {
+    float scroll = t * 210.0f;                                  // rainbow scroll
+    float beat = 0.45f + 0.55f * fabsf(sinf(TWO_PI_F * t * 2.2f));  // pulse
+
+    for (uint16_t i = 0; i < NUM_LEDS; i++) {
+        if (random8() < 8) {  // ~3% chance per LED per frame: a white sparkle
+            target[i][0] = target[i][1] = target[i][2] = 255.0f;
+            continue;
+        }
+        uint8_t hue = (uint8_t)((int)(i * 16 + scroll) & 0xFF);
+        CRGB c = CHSV(hue, 255, 255);
+        target[i][0] = c.r * beat;
+        target[i][1] = c.g * beat;
+        target[i][2] = c.b * beat;
+    }
+}
+
 // A calm rising blue dot shown until we have a real network time.
 void LedClock::buildWaitingTargets(float t, float target[][3]) {
     float pos = fmodf(t * 2.0f, (float)NUM_LEDS);  // rises ~2 LEDs/sec, wraps
@@ -111,12 +132,21 @@ void LedClock::render(float hourFloat, bool haveTime) {
 
     float t = now / 1000.0f;
 
-    // "Light all" preview overrides everything until it expires.
-    bool lightAll = lightAllUntilMs_ && (int32_t)(lightAllUntilMs_ - now) > 0;
+    // Timed overrides, highest priority first: a scheduled party beats the
+    // "Light all" preview, which beats the normal clock.
+    bool party = partyUntilMs_ && (int32_t)(partyUntilMs_ - now) > 0;
+    if (!party) partyUntilMs_ = 0;
+    bool lightAll = !party && lightAllUntilMs_ && (int32_t)(lightAllUntilMs_ - now) > 0;
     if (!lightAll) lightAllUntilMs_ = 0;
 
+    partying_ = party;
+
     float target[NUM_LEDS][3];
-    if (lightAll) {
+    float tau = EASE_TAU_S;
+    if (party) {
+        buildPartyTargets(t, target);
+        tau = PARTY_EASE_TAU_S;
+    } else if (lightAll) {
         buildAllOnTargets(t, target);
     } else if (haveTime) {
         buildClockTargets(hourFloat, t, target);
@@ -124,7 +154,13 @@ void LedClock::render(float hourFloat, bool haveTime) {
         buildWaitingTargets(t, target);
     }
 
-    easeAndShow(target, dt);
+    easeAndShow(target, dt, tau);
+}
+
+void LedClock::partyFor(uint32_t durationMs) {
+    uint32_t until = millis() + durationMs;
+    if (until == 0) until = 1;  // 0 is our "inactive" sentinel
+    partyUntilMs_ = until;
 }
 
 void LedClock::lightAllFor(uint32_t durationMs) {
@@ -133,10 +169,11 @@ void LedClock::lightAllFor(uint32_t durationMs) {
     lightAllUntilMs_ = until;
 }
 
-void LedClock::easeAndShow(const float target[][3], float dt) {
+void LedClock::easeAndShow(const float target[][3], float dt, float tau) {
     // Exponential ease toward the target: feels organic and naturally smooths
-    // both the shimmer and any larger jumps (hour change, new scheme).
-    float alpha = primed_ ? (1.0f - expf(-dt / EASE_TAU_S)) : 1.0f;
+    // both the shimmer and any larger jumps (hour change, new scheme). A smaller
+    // tau (party mode) tracks fast motion; the normal tau is calm and gentle.
+    float alpha = primed_ ? (1.0f - expf(-dt / tau)) : 1.0f;
     primed_ = true;
 
     for (uint16_t i = 0; i < NUM_LEDS; i++) {

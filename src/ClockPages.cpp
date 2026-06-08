@@ -10,6 +10,9 @@ static const char* CLOCK_NVS_NAMESPACE = "clock";
 static const char* CLOCK_NVS_KEY_TZ = "tz";
 static const char* CLOCK_NVS_KEY_SCHEME = "scheme";
 static const char* CLOCK_NVS_KEY_BRI = "bri";
+static const char* CLOCK_NVS_KEY_PARTY_EN = "party_en";
+static const char* CLOCK_NVS_KEY_PARTY_H = "party_h";
+static const char* CLOCK_NVS_KEY_PARTY_M = "party_m";
 
 // Default timezone: US Pacific.
 const char* DEFAULT_TIMEZONE = "PST8PDT,M3.2.0,M11.1.0";
@@ -42,10 +45,17 @@ void ClockPages::begin() {
     if (schemeIndex >= COLOR_SCHEME_COUNT) schemeIndex = 0;
     brightness = prefs.getUChar(CLOCK_NVS_KEY_BRI, 140);
 
+    partyEnabled = prefs.getBool(CLOCK_NVS_KEY_PARTY_EN, false);
+    partyHour = prefs.getUChar(CLOCK_NVS_KEY_PARTY_H, 18);
+    if (partyHour > 23) partyHour = 18;
+    partyMinute = prefs.getUChar(CLOCK_NVS_KEY_PARTY_M, 0);
+    if (partyMinute > 59) partyMinute = 0;
+
     applyTimezone();
     applyToLeds();
-    ESP_LOGI(TAG, "Loaded: tz=%s scheme=%u bri=%u",
-             timezone.c_str(), schemeIndex, brightness);
+    ESP_LOGI(TAG, "Loaded: tz=%s scheme=%u bri=%u party=%s %02u:%02u",
+             timezone.c_str(), schemeIndex, brightness,
+             partyEnabled ? "on" : "off", partyHour, partyMinute);
 }
 
 void ClockPages::applyTimezone() {
@@ -64,6 +74,7 @@ void ClockPages::registerRoutes() {
     server.on("/save", HTTP_POST, std::bind(&ClockPages::handleSave, this));
     server.on("/apply", HTTP_GET, std::bind(&ClockPages::handleApply, this));
     server.on("/all", HTTP_GET, std::bind(&ClockPages::handleAll, this));
+    server.on("/party", HTTP_GET, std::bind(&ClockPages::handleParty, this));
     server.on("/state", HTTP_GET, std::bind(&ClockPages::handleState, this));
 }
 
@@ -107,12 +118,38 @@ void ClockPages::handleRoot() {
     }
     html += "</select>";
 
+    // Party time: a daily one-minute light show at the chosen 24-hour time.
+    html += "<label style='display:block;margin-top:12px;'>"
+            "<input type='checkbox' name='party_en'";
+    if (partyEnabled) html += " checked";
+    html += "> Party time</label>";
+    html += "<div style='display:flex;gap:8px;align-items:center;'>";
+    html += "<select name='party_h' style='font-size:16px;padding:8px;'>";
+    for (uint8_t h = 0; h < 24; h++) {
+        char b[3]; snprintf(b, sizeof(b), "%02u", h);
+        html += "<option value='" + String(h) + "'";
+        if (h == partyHour) html += " selected";
+        html += ">" + String(b) + "</option>";
+    }
+    html += "</select><span>:</span>";
+    html += "<select name='party_m' style='font-size:16px;padding:8px;'>";
+    for (uint8_t m = 0; m < 60; m++) {
+        char b[3]; snprintf(b, sizeof(b), "%02u", m);
+        html += "<option value='" + String(m) + "'";
+        if (m == partyMinute) html += " selected";
+        html += ">" + String(b) + "</option>";
+    }
+    html += "</select></div>";
+
     html += "<p><button type='submit' class='button primary'>Save</button></p>";
     html += "</form>";
 
-    // Preview button: lights the whole strip for 10s (outside the form so it
-    // doesn't submit). It returns to the clock automatically.
-    html += "<p><button type='button' id='allbtn' class='button small'>Light all (10s)</button></p>";
+    // Action buttons outside the form so they don't submit. Each runs on the
+    // device and returns to the clock on its own.
+    html += "<p>"
+            "<button type='button' id='allbtn' class='button small'>Light all (10s)</button> "
+            "<button type='button' id='partybtn' class='button small'>Party now (1 min)</button>"
+            "</p>";
 
     html += "<p><a href='/wifi' class='button small'>WiFi Settings</a></p>";
 
@@ -127,7 +164,8 @@ void ClockPages::handleRoot() {
             "function tick(){"
             "fetch('/state').then(function(r){return r.json();}).then(function(d){"
             "var c=document.getElementById('clock');var h=document.getElementById('hint');"
-            "if(d.valid){c.textContent=d.time;h.textContent='hour '+d.hour+' of 24';h.style.color='#222';}"
+            "if(d.party){c.textContent=d.valid?d.time:'--:--:--';h.textContent='\\uD83C\\uDF89 party time!';h.style.color='#a0f';}"
+            "else if(d.valid){c.textContent=d.time;h.textContent='hour '+d.hour+' of 24';h.style.color='#222';}"
             "else{h.textContent='waiting for network time...';h.style.color='#888';}"
             "if(d.leds){for(var i=0;i<24&&i<d.leds.length;i++){cells[i].style.background=d.leds[i];}}"
             "}).catch(function(){});"
@@ -145,9 +183,11 @@ void ClockPages::handleRoot() {
             "function applyLive(){pending=true;if(!inflight)send();}"
             "schemeSel.addEventListener('change',applyLive);"
             "briInput.addEventListener('input',applyLive);"
-            // "Light all" preview: trigger on the device, then refresh quickly.
+            // Action buttons: trigger on the device, then refresh quickly.
             "document.getElementById('allbtn').addEventListener('click',function(){"
             "fetch('/all').then(function(){tick();}).catch(function(){});});"
+            "document.getElementById('partybtn').addEventListener('click',function(){"
+            "fetch('/party').then(function(){tick();}).catch(function(){});});"
             "setInterval(tick,1000);tick();"
             "</script>";
 
@@ -159,6 +199,8 @@ void ClockPages::handleRoot() {
 void ClockPages::handleState() {
     WebServer& server = configServer.getServer();
 
+    const char* party = ledClock.isPartying() ? "true" : "false";
+
     struct tm timeinfo;
     String json;
     if (getLocalTime(&timeinfo, 0) && timeinfo.tm_year > 120) {  // year > 2020
@@ -167,9 +209,11 @@ void ClockPages::handleState() {
         int displayHour = timeinfo.tm_hour + 1;  // 1..24, matches the strip
         json = String("{\"valid\":true,\"time\":\"") + buf +
                "\",\"hour\":" + displayHour +
+               ",\"party\":" + party +
                ",\"leds\":" + ledClock.colorsJson() + "}";
     } else {
-        json = String("{\"valid\":false,\"leds\":") + ledClock.colorsJson() + "}";
+        json = String("{\"valid\":false,\"party\":") + party +
+               ",\"leds\":" + ledClock.colorsJson() + "}";
     }
 
     server.send(200, "application/json", json);
@@ -205,6 +249,12 @@ void ClockPages::handleAll() {
     configServer.getServer().send(200, "text/plain", "ok");
 }
 
+void ClockPages::handleParty() {
+    // Kick off a one-minute party right now (manual test of the show).
+    ledClock.partyFor(60000);
+    configServer.getServer().send(200, "text/plain", "ok");
+}
+
 void ClockPages::handleSave() {
     WebServer& server = configServer.getServer();
 
@@ -237,9 +287,29 @@ void ClockPages::handleSave() {
         prefs.putUChar(CLOCK_NVS_KEY_BRI, brightness);
     }
 
+    // Party time. An unchecked checkbox sends no arg at all, so its presence is
+    // the enabled flag. The hour/minute selects always submit a value.
+    partyEnabled = server.hasArg("party_en");
+    prefs.putBool(CLOCK_NVS_KEY_PARTY_EN, partyEnabled);
+    if (server.hasArg("party_h")) {
+        int h = server.arg("party_h").toInt();
+        if (h < 0) h = 0;
+        if (h > 23) h = 23;
+        partyHour = (uint8_t)h;
+        prefs.putUChar(CLOCK_NVS_KEY_PARTY_H, partyHour);
+    }
+    if (server.hasArg("party_m")) {
+        int m = server.arg("party_m").toInt();
+        if (m < 0) m = 0;
+        if (m > 59) m = 59;
+        partyMinute = (uint8_t)m;
+        prefs.putUChar(CLOCK_NVS_KEY_PARTY_M, partyMinute);
+    }
+
     applyToLeds();
-    ESP_LOGI(TAG, "Saved: tz=%s scheme=%u bri=%u",
-             timezone.c_str(), schemeIndex, brightness);
+    ESP_LOGI(TAG, "Saved: tz=%s scheme=%u bri=%u party=%s %02u:%02u",
+             timezone.c_str(), schemeIndex, brightness,
+             partyEnabled ? "on" : "off", partyHour, partyMinute);
 
     // Redirect back to the form (303 -> GET).
     server.sendHeader("Location", "/");

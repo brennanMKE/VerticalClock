@@ -37,8 +37,11 @@ be joined to your network without hard-coding credentials.
    scheme switches, brightness — ease in over a few seconds rather than snapping.
 6. Until the first NTP sync, a calm blue dot rises along the strip to show the
    clock is alive and waiting for time.
-7. Timezone, color scheme, and brightness are selectable from the device's web
-   page and stored in NVS, so they survive reboots.
+7. **Party time.** At a configurable 24-hour time, the clock is suspended for one
+   minute and the strip runs a lively show — a fast scrolling rainbow with a beat
+   pulse and white sparkles — then returns to the clock on its own.
+8. Timezone, color scheme, brightness, and the party time are selectable from the
+   device's web page and stored in NVS, so they survive reboots.
 
 ---
 
@@ -140,9 +143,17 @@ Once the device is on your WiFi, open its web page (see
 - **Color scheme** — pick from the built-in schemes; applies immediately.
 - **Brightness** — a slider (5–255) driving the strip's master brightness.
 - **Timezone** — a dropdown of common zones.
+- **Party time** — a checkbox to enable it plus 24-hour hour/minute selectors.
+  When enabled, the strip throws a one-minute party at that time every day.
 
-Click **Save**; all three apply within about a second and are written to NVS, so
-they're restored on every boot (defaults: Natural Day, brightness 140, Pacific).
+Click **Save**; settings apply within about a second and are written to NVS, so
+they're restored on every boot (defaults: Natural Day, brightness 140, Pacific,
+party off at 18:00).
+
+Two buttons below the form run on the device immediately and return to the clock
+on their own: **Light all (10s)** (full-strip color preview) and
+**Party now (1 min)** (test the party show without waiting for the scheduled
+time).
 
 Built-in zones: Pacific, Mountain, Arizona (no DST), Central, Eastern (US), UK /
 Ireland, Central Europe, and UTC. To add more, edit `TIMEZONE_OPTIONS[]` in
