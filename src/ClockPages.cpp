@@ -84,14 +84,19 @@ void ClockPages::handleRoot() {
     String html = webPages->getHTMLHeader("Vertical Clock");
     html += "<h1>Vertical Clock</h1>";
 
-    // Live readout + a vertical preview of the physical strip (top = hour 24).
-    html += "<div style='display:flex;align-items:center;gap:20px;margin:16px 0;'>";
+    // Two columns: the vertical strip preview on the left (top = hour 24),
+    // everything else on the right, so the page stays short.
+    html += "<div style='display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;'>";
+
+    // Left column: live preview of the physical strip.
     html += "<div id='strip' style='display:flex;flex-direction:column-reverse;"
-            "gap:2px;padding:6px;background:#111;border-radius:8px;'></div>";
-    html += "<div>";
+            "gap:3px;padding:6px;background:#111;border-radius:8px;'></div>";
+
+    // Right column: readout + controls + actions.
+    html += "<div style='flex:1;min-width:280px;'>";
+
     html += "<div id='clock' style='font-size:40px;font-weight:bold;font-family:monospace;'>--:--:--</div>";
-    html += "<div id='hint' style='font-size:16px;color:#888;'>waiting for time...</div>";
-    html += "</div></div>";
+    html += "<div id='hint' style='font-size:16px;color:#888;margin-bottom:14px;'>waiting for time...</div>";
 
     html += "<form method='POST' action='/save'>";
 
@@ -141,17 +146,20 @@ void ClockPages::handleRoot() {
     }
     html += "</select></div>";
 
-    html += "<p><button type='submit' class='button primary'>Save</button></p>";
+    // All actions share one row. Save submits the form; the others are
+    // type=button so they run on the device without submitting.
+    html += "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;'>";
+    html += "<button type='submit' class='button primary'>Save</button>";
+    html += "<button type='button' id='allbtn' class='button small'>Light all (60s)</button>";
+    html += "<button type='button' id='partybtn' class='button small'>Party now (1 min)</button>";
+    html += "</div>";
+
     html += "</form>";
 
-    // Action buttons outside the form so they don't submit. Each runs on the
-    // device and returns to the clock on its own.
-    html += "<p>"
-            "<button type='button' id='allbtn' class='button small'>Light all (10s)</button> "
-            "<button type='button' id='partybtn' class='button small'>Party now (1 min)</button>"
-            "</p>";
+    html += "<p style='margin-top:12px;'><a href='/wifi' class='button small'>WiFi Settings</a></p>";
 
-    html += "<p><a href='/wifi' class='button small'>WiFi Settings</a></p>";
+    html += "</div>";   // end right column
+    html += "</div>";   // end columns
 
     // Build the 24 preview cells once, then poll /state to recolor them and
     // update the clock readout in place.
@@ -159,7 +167,7 @@ void ClockPages::handleRoot() {
             "var strip=document.getElementById('strip');"
             "var cells=[];"
             "for(var i=0;i<24;i++){var d=document.createElement('div');"
-            "d.style.width='26px';d.style.height='9px';d.style.borderRadius='2px';"
+            "d.style.width='42px';d.style.height='14px';d.style.borderRadius='3px';"
             "d.style.background='#000';strip.appendChild(d);cells.push(d);}"
             "function tick(){"
             "fetch('/state').then(function(r){return r.json();}).then(function(d){"
@@ -243,9 +251,9 @@ void ClockPages::handleApply() {
 }
 
 void ClockPages::handleAll() {
-    // Light every LED at full (current scheme colors) for 10s, then the clock
+    // Light every LED at full (current scheme colors) for 60s, then the clock
     // resumes on its own. Nothing is persisted.
-    ledClock.lightAllFor(10000);
+    ledClock.lightAllFor(60000);
     configServer.getServer().send(200, "text/plain", "ok");
 }
 
