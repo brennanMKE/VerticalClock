@@ -136,7 +136,11 @@ use **Factory Reset** from the EasyWiFi WiFi page.
 ## Configuring the clock
 
 Once the device is on your WiFi, open its web page (see
-[Finding the device](#finding-the-device-on-your-network)). The page shows:
+[Finding the device](#finding-the-device-on-your-network)).
+
+![Vertical Clock web configuration page](VerticalClock.png)
+
+The page shows:
 
 - A **live preview** of the physical strip (top = hour 24) that mirrors the real
   colors, plus the current time and which hour of 24 it is.
@@ -151,7 +155,7 @@ they're restored on every boot (defaults: Natural Day, brightness 140, Pacific,
 party off at 18:00).
 
 Two buttons below the form run on the device immediately and return to the clock
-on their own: **Light all (10s)** (full-strip color preview) and
+on their own: **Light all (60s)** (full-strip color preview) and
 **Party now (1 min)** (test the party show without waiting for the scheduled
 time).
 
@@ -194,6 +198,7 @@ OPEN=1 ./find-clock.sh       # also open the first match in your browser
 VerticalClock/
 ├── platformio.ini        # Board, build flags, FastLED/EasyWiFi/ArduinoJson deps
 ├── find-clock.sh         # macOS mDNS finder for the device
+├── VerticalClock.png     # Screenshot of the web configuration page
 └── src/
     ├── main.cpp          # Setup/loop: EasyWiFi, NTP, drives the LED clock @60fps
     ├── LedClock.h        # LedClock: renders the 24-LED bar, shimmer + blending
