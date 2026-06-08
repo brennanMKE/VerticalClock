@@ -1,0 +1,44 @@
+# PlatformIO build output and downloaded dependencies
+.pio/
+.pioenvs/
+.piolibdeps/
+.pio.nosync/
+
+# PlatformIO / CMake helper files
+CMakeListsPrivate.txt
+cmake-build-*/
+
+# Editor / tooling
+.vscode/
+.claude/
+.github/
+.idea/
+.clang_complete
+.gcc-flags.json
+compile_commands.json
+*.code-workspace
+
+# Editor swap / backup files
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+.Trash-*

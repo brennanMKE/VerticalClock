@@ -1,0 +1,7 @@
+# Normalize line endings: store everything as LF in the repo.
+# (text=auto detects text vs binary and applies LF to all tracked text files,
+# including the .cpp/.h/.ini/.md/.sh this project uses.)
+* text=auto eol=lf
+
+# Count C++ headers as C++ for GitHub language stats (else .h reads as C).
+*.h linguist-language=C++
