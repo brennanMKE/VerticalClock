@@ -9,7 +9,7 @@ and breathes gently so the display feels alive rather than static.
 The time comes from the internet (NTP); the timezone, color scheme, and
 brightness are all chosen from a small built-in web page — no reflashing needed.
 
-- **LED data** on **GPIO 5** (24 × WS2812b, GRB)
+- **LED data** on **GPIO 4** (24 × WS2812b, GRB)
 
 WiFi onboarding is handled by [EasyWiFi](https://github.com/brennanMKE/EasyWiFi):
 on first boot the device hosts a setup hotspot with a captive portal, so it can
@@ -78,7 +78,7 @@ vivid all day long. Built-in:
 ### Wiring
 
 ```
-ESP32-C3 GPIO 5 ──[330 Ω]──▶ DIN (WS2812b)
+ESP32-C3 GPIO 4 ──[330 Ω]──▶ DIN (WS2812b)
 ESP32-C3 GND ───────────────▶ GND  (must be common with the strip's supply)
 5 V supply  ───────────────▶ 5 V
                               └─[1000 µF]─ GND   (near the first LED)
@@ -88,7 +88,7 @@ ESP32-C3 GND ───────────────▶ GND  (must be comm
 > pin, once you have more than a handful of LEDs lit. Tie the supply ground to
 > the ESP32 ground so the data signal has a return path.
 
-> **GPIO 5** is an ordinary GPIO on the ESP32-C3 (not a strapping pin), so it is
+> **GPIO 4** is an ordinary GPIO on the ESP32-C3 (not a strapping pin), so it is
 > safe for the data line. Avoid the strapping pins (GPIO2 / GPIO8 / GPIO9) and
 > the USB pins. To use a different pin, change `LED_DATA_PIN` in
 > [`src/LedClock.cpp`](src/LedClock.cpp). The LED count is `NUM_LEDS` in

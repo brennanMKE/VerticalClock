@@ -2,9 +2,10 @@
 #include "ColorSchemes.h"
 #include <math.h>
 
-// Data pin for the WS2812b strip. GPIO 5 is an ordinary GPIO on the ESP32-C3
-// (not a strapping pin), so it is safe to drive the strip from here.
-#define LED_DATA_PIN 5
+// Data pin for the WS2812b strip. GPIO 4 is an ordinary GPIO on the ESP32-C3
+// (not a strapping pin), so it is safe to drive the strip from here. (Matches
+// the wiring used by the GlowKitchen project.)
+#define LED_DATA_PIN 4
 
 // ===== Animation tuning =====
 // The strip should feel alive but calm. Two independent slow oscillators give
