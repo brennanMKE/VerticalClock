@@ -24,7 +24,6 @@ RunLoop runloop;
 LedClock ledClock;
 ClockPages clockPages(runloop.getConfigServer(), ledClock);
 
-bool ntpConfigured = false;   // configTzTime() called once after first connect
 bool haveValidTime = false;   // true once NTP has delivered a real time
 float currentHourFloat = 0.0f; // local time as hours since midnight
 
@@ -52,13 +51,18 @@ void loop() {
     // Keep EasyWiFi's state machine (connect / AP portal / recovery) running.
     runloop.loop();
 
-    // Once WiFi is up, configure NTP exactly once.
-    if (!ntpConfigured && WiFi.status() == WL_CONNECTED) {
+    // Once WiFi is up, configure NTP; re-apply whenever the timezone changes.
+    if (WiFi.status() == WL_CONNECTED) {
         String tz = clockPages.getTimezone();
-        configTzTime(tz.c_str(), NTP_SERVER_1, NTP_SERVER_2);
-        ntpConfigured = true;
-        ESP_LOGI(TAG, "NTP configured (TZ=%s)", tz.c_str());
-        Serial.println("Connected. Network time configured, waiting for sync...");
+        static String lastAppliedTz = "";
+
+        if (tz != lastAppliedTz) {
+            configTzTime(tz.c_str(), NTP_SERVER_1, NTP_SERVER_2);
+            lastAppliedTz = tz;
+            haveValidTime = false; // re-validate time under the new timezone
+            ESP_LOGI(TAG, "NTP configured (TZ=%s)", tz.c_str());
+            Serial.println("Connected. Network time configured, waiting for sync...");
+        }
     }
 
     // Refresh local time once per second; the LEDs interpolate between updates.
